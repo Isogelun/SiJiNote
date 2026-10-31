@@ -14,6 +14,12 @@ plugins {
 val KEY_PAGE_NAME = "pageName"
 
 kotlin {
+    jvm("compose") {
+        compilerOptions.jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        )
+    }
+
     androidTarget {
         compilations.all {
             kotlinOptions {
@@ -59,10 +65,28 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                implementation(compose.runtime)
+//                implementation("com.tencent.kuikly-open:core:${Version.getKuiklyVersion()}")
+//                implementation("com.tencent.kuikly-open:core-annotations:${Version.getKuiklyVersion()}")
+//                implementation("com.tencent.kuikly-open:compose:${Version.getKuiklyVersion()}")
+            }
+        }
+        val kuiklyMain by creating {
+            dependsOn(commonMain)
+            dependencies {
                 implementation("com.tencent.kuikly-open:core:${Version.getKuiklyVersion()}")
                 implementation("com.tencent.kuikly-open:core-annotations:${Version.getKuiklyVersion()}")
                 implementation("com.tencent.kuikly-open:compose:${Version.getKuiklyVersion()}")
-
+            }
+        }
+        val jsMain by getting {
+            dependsOn(kuiklyMain)
+        }
+        val composeMain by getting {
+            dependencies {
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.desktop.common)
             }
         }
         val commonTest by getting {
@@ -71,6 +95,7 @@ kotlin {
             }
         }
         val androidMain by getting {
+            dependsOn(kuiklyMain)
             dependencies {
                 api("com.tencent.kuikly-open:core-render-android:${Version.getKuiklyVersion()}")
             }
@@ -80,7 +105,8 @@ kotlin {
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting
         val iosMain by creating {
-            dependsOn(commonMain)
+            dependsOn(kuiklyMain)
+            // dependsOn(commonMain)
             iosX64Main.dependsOn(this)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
@@ -116,13 +142,28 @@ ksp {
     arg(KEY_PAGE_NAME, getPageName())
 }
 
+//dependencies {
+//    compileOnly("com.tencent.kuikly-open:core-ksp:${Version.getKuiklyVersion()}") {
+//        add("kspAndroid", this)
+//        add("kspIosArm64", this)
+//        add("kspIosX64", this)
+//        add("kspIosSimulatorArm64", this)
+//        add("kspJs", this)
+//    }
+//}
+
 dependencies {
-    compileOnly("com.tencent.kuikly-open:core-ksp:${Version.getKuiklyVersion()}") {
-        add("kspAndroid", this)
-        add("kspIosArm64", this)
-        add("kspIosX64", this)
-        add("kspIosSimulatorArm64", this)
-        add("kspJs", this)
+    val kuiklyProcessor =
+        "com.tencent.kuikly-open:core-ksp:${Version.getKuiklyVersion()}"
+
+    listOf(
+        "kspAndroid",
+        "kspJs",
+        "kspIosArm64",
+        "kspIosX64",
+        "kspIosSimulatorArm64"
+    ).forEach { configurationName ->
+        add(configurationName, kuiklyProcessor)
     }
 }
 

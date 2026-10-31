@@ -52,12 +52,19 @@ kotlin {
 
             }
         }
+        val kuiklyMain by creating {
+            dependsOn(commonMain)
+        }
+        val ohosArm64Main by getting {
+            dependsOn(kuiklyMain)
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
             }
         }
         val androidMain by getting {
+            dependsOn(kuiklyMain)
             dependencies {
                 api("com.tencent.kuikly-open:core-render-android:${Version.getKuiklyOhosVersion()}")
             }
@@ -67,7 +74,7 @@ kotlin {
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting
         val iosMain by creating {
-            dependsOn(commonMain)
+            dependsOn(kuiklyMain)
             iosX64Main.dependsOn(this)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
