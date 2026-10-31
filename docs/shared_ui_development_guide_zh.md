@@ -1,6 +1,6 @@
 # 共享界面后续开发指南
 
-更新日期：2026-10-31（Asia/Shanghai）。
+更新日期：2026-11-01（Asia/Shanghai）。
 
 本文以当前工程目录为基础，说明 Android 和 desktop 共用界面时的开发方式。它是后续实施指南，不代表文中规划的组件、路由、存储功能已经实现。架构背景参见 [单模块共享 UI 方案](shared_ui_single_module_zh.md)。
 
@@ -9,12 +9,11 @@
 ```text
 shared/src/
 ├── commonMain/kotlin/com/isogelun/sijinote/
-│   ├── app/IndexScreen.kt      目前显示三行文本
+│   ├── app/Index.kt            定义 IndexScreen()，目前显示三行文本
 │   └── ui/UI.kt               UiText、UiColumn 的 expect 声明
 ├── kuiklyMain/kotlin/com/isogelun/sijinote/
-│   ├── app/Kuikly.kt          @Page("index")，调用 IndexScreen
-│   ├── ui/UI.kt               Kuikly actual 实现
-│   └── base/                 Kuikly 容器与桥接基础代码
+│   ├── app/Kuikly.kt          直接继承 ComposeContainer，注册 index
+│   └── ui/UI.kt               Kuikly actual 实现
 └── composeMain/kotlin/com/isogelun/sijinote/
     ├── app/Compose.kt         桌面窗口、Material3 主题，调用 IndexScreen
     └── ui/UI.kt               官方 Compose actual 实现
@@ -23,7 +22,11 @@ desktopApp/src/main/kotlin/Main.kt
     main() → runSiJiNoteDesktop()
 ```
 
-Android 默认页标识为 `index`。Android 和 desktop 已接入同一个 `IndexScreen()`；Kuikly 入口也供其他 Kuikly 平台复用，但其他宿主是否默认打开 `index`，需要分别配置。
+Android、H5、iOS、鸿蒙的默认页标识均已配置为 `index`。desktop 直接通过窗口调用同一个 `IndexScreen()`。H5 的 `page_name` 参数和 Android、鸿蒙传入的页面参数仍可指定其他页面，但显式指定的页面必须实际注册；旧 `router` 已移除。小程序宿主未在本轮完成启动与运行验证。
+
+共享层的模板 `RouterPage.kt`、`ImageAdapterBenchmarks.kt`、`BasicWidget.kt`、`Utils.kt`、`IPagerIdKtx.kt`、`BridgeModule.kt`、`BasePager.kt` 及测试图片已清理。`kuiklyMain` 只保留应用入口和 UI 适配；各宿主自身的桥接实现仍保留。Kuikly 入口直接使用框架默认容器行为，不再包含原 BasePager 的主题参数与调试行为覆盖。
+
+验证记录：清理前曾通过桌面、Android、JS 编译及 index 页面注册检查；用户已确认 desktop、H5 显示三行共享文本，内置浏览器也观察到 H5 内容。最近删除模板及 BasePager 后未重新编译或启动验证，不能把先前结果当作清理后版本的完整验收。iOS、鸿蒙没有完成实际运行验证。
 
 目前公共组件只有 `UiText` 和 `UiColumn`。按钮、输入框、列表、公共导航及数据保存均属于下一步工作。
 
@@ -33,8 +36,8 @@ Android 默认页标识为 `index`。Android 和 desktop 已接入同一个 `Ind
 
 ```text
 app/
-├── IndexScreen.kt             根界面：组装应用状态、选择当前页面
-├── navigation/
+├── Index.kt                   定义 IndexScreen()，后续扩展为根界面
+├── route/
 │   └── AppRoute.kt            页面标识及参数
 ├── note/
 │   ├── NoteListScreen.kt      笔记列表页
@@ -77,7 +80,7 @@ desktopApp → Compose.kt ──┘
 先采用公共层状态驱动页面切换。第一阶段可用枚举；打开已有笔记时，路由需要携带笔记 ID，因此可以直接使用以下最小路由模型。
 
 ```kotlin
-package com.isogelun.sijinote.app.navigation
+package com.isogelun.sijinote.app.route
 
 sealed interface AppRoute {
     data object Notes : AppRoute
@@ -163,7 +166,87 @@ expect fun UiButton(
 
 列表中的每条笔记应有稳定 ID。编辑现有笔记使用 ID 读取数据，避免用列表位置代表笔记身份。正式保存、加密和同步另做实现，不以演示交互代替数据安全能力。
 
-## 7. 推荐实施顺序
+## 7. 桌面、手机及 H5 的差异如何处理
+
+### 7.1 先区分空间差异和平台能力差异
+
+共享的是业务状态、页面区块和操作含义，界面允许根据可用空间和交互能力变化。不要为适配桌面另复制一整套业务页面。
+
+| 差异 | 放在哪里处理 | 例子 |
+| --- | --- | --- |
+| 可用空间 | commonMain 的自适应布局 | 窄窗口单栏，宽窗口左右分栏 |
+| 框架组件 API | 两端 ui actual | Kuikly Column 与官方 Compose Column |
+| 平台专属操作 | 公共能力接口 + 平台实现 | 文件选择、快捷键、系统返回、剪贴板 |
+| 平台专属界面区块 | 公共插槽或小型 expect/actual 组件 | 桌面工具栏、触屏操作栏 |
+| 系统环境 | 平台入口或中立环境接口 | 安全区、键盘遮挡、生命周期 |
+
+`kuiklyMain` 是渲染框架分组，不等于手机端：它同时服务 Android、iOS、H5 和鸿蒙。桌面浏览器里的 H5 也可能需要宽屏布局；触屏、鼠标和快捷键能力也不能仅根据源码集名称判断。
+
+### 7.2 在公共层根据实际可用宽度选择布局
+
+建议后续增加中立的布局类型和观测接口。以下是待实现的接口设计，不是当前已有 API：
+
+```kotlin
+enum class AppLayout { Compact, Expanded }
+
+@Composable
+expect fun rememberAppLayout(): AppLayout
+```
+
+两端实现读取当前内容容器的可用宽度，将其转换为中立类型。优先测量容器约束；受框架 API 限制时再由宿主传入并持续更新。不要只在启动时读取一次屏幕分辨率，也不要把物理像素直接当作 dp。
+
+宽度阈值根据列表和编辑器的最小可用宽度选择，先在项目中集中定义一个待验证值，再用实际内容调整。桌面窗口缩放、手机旋转、浏览器尺寸变化及分屏都应触发布局更新。第一轮只需要 Compact/Expanded，无需提前设计所有设备分类。
+
+```text
+Compact                         Expanded
+┌─────────────────┐             ┌───────────┬────────────────┐
+│ 笔记列表 或 编辑器 │             │ 笔记列表   │ 编辑器或未选提示 │
+└─────────────────┘             └───────────┴────────────────┘
+```
+
+列表和编辑器是公共区块；窄屏按当前路由显示一个，宽屏同时显示两个。实现双栏还需要中立的横向布局和剩余空间分配能力，当前 UiColumn/UiText 不足以完成它。
+
+### 7.3 业务状态放在自适应分支之外
+
+以下仅示意数据流，NotesState、rememberNotesState 和页面函数均需后续实现：
+
+```kotlin
+@Composable
+fun NotesScreen() {
+    val notesState = rememberNotesState()
+    val layout = rememberAppLayout()
+
+    when (layout) {
+        AppLayout.Compact -> CompactNotesScreen(notesState)
+        AppLayout.Expanded -> ExpandedNotesScreen(notesState)
+    }
+}
+```
+
+两种布局操作同一个状态持有者。选中笔记 ID、编辑草稿、保存状态不能分别 remember 在两个布局分支里，否则跨阈值重组时可能重置。需要保留的列表滚动位置也应明确存放位置。
+
+提前规定宽窄布局转换规则：从宽屏变窄时，已打开笔记则显示编辑器，未选中笔记则显示列表；恢复宽屏时保留选中笔记和草稿。路由切换与宽度变化都不能隐式触发保存或丢弃。
+
+### 7.4 平台专属能力用接口，专属 UI 用插槽
+
+同一个“保存”动作可以由触屏按钮、桌面菜单或快捷键触发，最终都调用公共业务层的同一个保存函数。文件选择的具体 API 留在平台侧，公共层接收中立的结果或错误。
+
+某一小块界面需要不同实现时，可以定义语义明确的 `expect/actual` 组件；如果只是容器需要注入操作区，优先用公共 `@Composable () -> Unit` 插槽。不要为了每个页面增加一大组 `isDesktop` 分支，也不要把平台 Modifier 放进公共插槽参数。
+
+Kuikly actual 内还可能需要按宿主能力区分 Android、iOS 和 H5；确有需要时再向叶子源码集下沉实现，不假设这些平台共享所有系统 API。
+
+### 7.5 自适应验收
+
+- 用窄、宽两种桌面窗口和 H5 视口检查布局，手机横竖屏检查内容是否可用。
+- 拖动窗口反复跨过阈值，选中笔记、输入草稿和保存状态保持一致。
+- 小窗口可滚动，没有被固定宽度挤出屏幕的主要操作。
+- 手机系统返回、页面返回按钮和桌面导航操作落到同一套公共返回逻辑。
+- 触屏用户无需依赖悬停或右键才能完成必要操作，键盘用户能访问主要操作。
+- 手机状态栏、安全区和输入法出现后，编辑内容及操作按钮仍可见。
+
+当前尚未实现上述布局接口、分栏、专属能力和返回适配。先完成共享列表和编辑交互，再增加自适应组合；状态归属在第一轮就按上述规则安排。
+
+## 8. 推荐实施顺序
 
 | 阶段 | 工作 | 验收结果 |
 | --- | --- | --- |
@@ -172,12 +255,12 @@ expect fun UiButton(
 | 3. 内存闭环 | 使用稳定 ID，实现内存中的增删改查 | 新建后能打开、修改、返回并看到更新 |
 | 4. 草稿与返回 | 明确取消、保存、未保存返回的行为 | 切页不会意外丢输入，系统返回行为明确 |
 | 5. 本地保存 | 增加存储接口及平台实现 | 重启后笔记仍存在，错误可反馈 |
-| 6. 布局完善 | 滚动、主题、状态栏避让、桌面尺寸适配 | 手机内容不被状态栏和键盘遮挡，桌面缩放可用 |
+| 6. 自适应与平台交互 | 中立宽度观测、单栏/双栏、滚动、主题、安全区和必要的专属操作 | 跨布局不丢草稿，手机与桌面交互均可用，H5 宽窄视口正常 |
 | 7. 扩展平台 | iOS、鸿蒙及其他宿主独立验证 | 记录各平台实际编译与运行结果 |
 
 第一步先完成“列表 → 新建编辑 → 返回列表”，再加入设置页。多页面不等于必须同时显示多个页面；桌面以后需要左右分栏时，可让公共根界面根据中立的窗口尺寸信息选择布局。
 
-## 8. 开发与验证方式
+## 9. 开发与验证方式
 
 启动方式保持不变：
 
@@ -188,10 +271,16 @@ expect fun UiButton(
 
 Android 在 IDE 中运行 `androidApp`，默认进入 `index`。
 
+H5 本次运行验证地址为 `http://localhost:8080/`。当前 HTML 还会单独从 `http://127.0.0.1:8083/nativevue2.js` 加载共享业务脚本；宿主编译通过不等于业务 bundle 已更新。修改公共页面后，需要确保共享业务 JS 已重新生成、业务脚本服务可访问，再刷新页面。这里的端口是当前开发配置，不是所有环境的固定要求。
+
+此前 H5 控制台观察到外部 libpag 脚本的 `import.meta` 错误；三行文本仍正常显示，该问题未在本轮修复，后续使用相关动画能力前需独立处理。
+
 需要验证编译时，由开发者按改动范围选择任务：
 
 ```powershell
 .\gradlew.bat :shared:compileKotlinCompose :desktopApp:compileKotlin :androidApp:compileDebugKotlin :shared:compileKotlinJs --console=plain
+# H5 宿主源码编译检查；不等同于浏览器分发产物的完整构建
+.\gradlew.bat :h5App:compileKotlinJs --console=plain
 ```
 
 编译通过只能说明源码及依赖链路通过检查。共享界面的字体、间距、按钮响应、中文输入、滚动、键盘遮挡和返回行为仍需分别运行 Android 和 desktop 验证。
@@ -200,7 +289,7 @@ Windows 上的主构建不能替代 iOS 或鸿蒙验收。鸿蒙继续使用独�
 
 按照当前协作约定，自动修改代码后不默认发起编译，由开发者自行运行，除非另行要求。
 
-## 9. 每次新增页面的操作清单
+## 10. 每次新增页面的操作清单
 
 1. 在 `commonMain/app/功能目录` 新建页面。
 2. 优先复用公共组件和公共功能区块。
@@ -208,6 +297,7 @@ Windows 上的主构建不能替代 iOS 或鸿蒙验收。鸿蒙继续使用独�
 4. 为页面定义必要的状态参数和事件回调。
 5. 在公共路由和根界面中接入页面。
 6. 处理离开页面时的草稿、保存及返回行为。
-7. 在两端运行确认，再继续增加功能。
+7. 确定窄、宽布局的组合方式，共享选中项和草稿状态。
+8. 在 Android、desktop 和 H5 运行确认，再继续增加功能；iOS、鸿蒙按各自环境独立验收。
 
 日常界面开发主要发生在 `commonMain`。两端 `app` 容器通常只在主题、生命周期、窗口或宿主交互发生变化时调整。

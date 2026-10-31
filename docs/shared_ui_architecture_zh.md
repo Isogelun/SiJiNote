@@ -1,5 +1,7 @@
 # SiJiNote 跨框架共享 UI 方案
 
+> 历史设计文档：本文的 shared-core / shared-ui 双模块方案未采用。当前工程使用 shared 单模块的 commonMain、kuiklyMain、composeMain 分层。请先阅读 [当前实现快照](shared_ui_single_module_zh.md) 和 [后续开发指南](shared_ui_development_guide_zh.md)；本文保留为设计讨论参考，不作为当前目录及实施任务依据。
+
 更新日期：2026-10-31（Asia/Shanghai）。
 
 状态：设计基线，尚未完成工程实现及跨端验证。本文记录已讨论的方向，不代表两套框架的依赖、编译和运行兼容性已经验收。

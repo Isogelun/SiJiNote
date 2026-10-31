@@ -1,8 +1,24 @@
 # SiJiNote 单模块跨端 UI 共享方案（含桌面端）
 
-更新日期：2026-10-31（Asia/Shanghai）。
+更新日期：2026-11-01（Asia/Shanghai）。
 
-状态：**实施设计基线，尚未工程实现及构建、运行验证**。单模块共享、鸿蒙沿用 Kuikly 原方案、桌面使用 `composeMain` 的方向已确认。依赖声明已做部分元数据核对；这不代表最终依赖解析或跨端兼容性已通过验收。
+状态：**单模块源码集分层和最小共享文本界面已落地，业务页面、公共导航和自适应布局待开发**。日常开发以 [共享界面开发指南](shared_ui_development_guide_zh.md) 为准。
+
+## 当前实现快照（2026-11-01）
+
+- 公共页面为 `shared/src/commonMain/kotlin/com/isogelun/sijinote/app/Index.kt` 中的 `IndexScreen()`，当前显示三行文本；中立组件为 `ui/UI.kt` 中的 `UiText` 和 `UiColumn`。
+- Kuikly 入口为 `kuiklyMain/.../app/Kuikly.kt`，`Kuikly` 直接继承 `ComposeContainer`，注册 `@Page("index")` 并调用公共页面。
+- 桌面入口装配为 `composeMain/.../app/Compose.kt` 的 `runSiJiNoteDesktop()`，创建窗口并调用公共页面；`desktopApp` 只有 main 启动调用。当前没有 pageName 参数或 DesktopPageHost 路由表。
+- 主构建使用 `jvm("compose")`，桌面源码集为 `composeMain`；主脚本的 Kuikly 依赖位于 `kuiklyMain`。关闭默认层级模板，手工连接 Kuikly 各 target。
+- 主构建设置 `kuikly.useLocalKsp=true`，手工按 Android、JS、三个 iOS target 添加处理器。此前依赖检查确认 kspCompose 为空、desktopApp 运行依赖不含 Kuikly，生成注册代码包含 index。
+- Android、H5、iOS、鸿蒙宿主默认页已改为 index；小程序未在本轮完成启动验证。
+- 模板 router、图片测试页、BasicWidget、Utils、IPagerIdKtx、共享 BridgeModule 和 BasePager 已删除；测试图片已清理。各宿主自身桥接实现仍保留。
+- 清理前曾通过桌面、Android、JS 编译；desktop、H5 文本显示已有运行确认。最近模板和 BasePager 清理后没有重新构建，iOS 和鸿蒙没有运行验收。鸿蒙离线配置验证因 Kotlin `2.0.21-KBA-010` 插件未缓存而停止。
+- 共享 UI 允许窄屏单栏、宽屏分栏；布局按容器宽度决定，平台专属能力通过中立接口、插槽或小型适配组件处理。当前自适应能力尚未实现，详见开发指南第 7 节。
+
+## 以下为首轮设计基线（历史方案）
+
+以下章节保留初始设计及其论证，包含尚未实施的 DesktopRouter、UnknownPageScreen、旧目录和搬迁清单，不能直接当作当前工程结构或完整验收结果。与当前快照冲突时，以本节快照、开发指南及实际源码为准；新业务页面计划通过公共根界面管理导航，不要求每新增页面都添加一对平台路由。
 
 ## 0. 与既有文档的关系
 
