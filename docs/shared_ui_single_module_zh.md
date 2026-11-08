@@ -4,17 +4,19 @@
 
 状态：**单模块源码集分层和最小共享文本界面已落地，业务页面、公共导航和自适应布局待开发**。日常开发以 [共享界面开发指南](shared_ui_development_guide_zh.md) 为准。
 
-## 当前实现快照（2026-11-01）
+## 当前实现快照（2026-11-08）
 
-- 公共页面为 `shared/src/commonMain/kotlin/com/isogelun/sijinote/app/Index.kt` 中的 `IndexScreen()`，当前显示三行文本；中立组件为 `ui/UI.kt` 中的 `UiText` 和 `UiColumn`。
-- Kuikly 入口为 `kuiklyMain/.../app/Kuikly.kt`，`Kuikly` 直接继承 `ComposeContainer`，注册 `@Page("index")` 并调用公共页面。
-- 桌面入口装配为 `composeMain/.../app/Compose.kt` 的 `runSiJiNoteDesktop()`，创建窗口并调用公共页面；`desktopApp` 只有 main 启动调用。当前没有 pageName 参数或 DesktopPageHost 路由表。
+- 公共根界面为 `shared/src/commonMain/kotlin/com/isogelun/sijinote/app/Index.kt` 中的 `IndexScreen()`：内部持有 `AppState`，通过 `UiAdaptiveLayout(breakpointDp = 900)` 按容器宽度在 `DesktopShell`（三栏）与 `MobileShell`（单栏 + 底部导航）之间切换。
+- 中立组件层在 `ui/`：`UiTheme.kt` 定义颜色、字重、文本层级与图标矢量数据；`Ui.kt` 声明 `UiText`、`UiColumn`、`UiRow`、`UiBox`、`UiSpacer`、`UiDivider`、`UiTextField`、`UiIcon`、`UiAdaptiveLayout`，以及列/行作用域的 `Flex`。
+- Kuikly 入口为 `kuiklyMain/.../app/Kuikly.kt`，`Kuikly` 直接继承 `ComposeContainer`，注册 `@Page("index")` 并调用公共页面；桌面入口装配为 `composeMain/.../app/Compose.kt` 的 `runSiJiNoteDesktop()`。
+- 页面按功能分目录：`app/note`（列表面板、桌面编辑区、移动编辑页、卡片与正文块）、`app/search`、`app/favorites`、`app/settings`、`app/shell`（两端外壳）、`app/components`（角标、图标按钮、头像）。
+- 演示数据在 `data/SampleNotes.kt`，仅存在于内存；`NoteRepository` 尚无实现，重启后回到初始数据。
 - 主构建使用 `jvm("compose")`，桌面源码集为 `composeMain`；主脚本的 Kuikly 依赖位于 `kuiklyMain`。关闭默认层级模板，手工连接 Kuikly 各 target。
-- 主构建设置 `kuikly.useLocalKsp=true`，手工按 Android、JS、三个 iOS target 添加处理器。此前依赖检查确认 kspCompose 为空、desktopApp 运行依赖不含 Kuikly，生成注册代码包含 index。
+- 主构建设置 `kuikly.useLocalKsp=true`，手工按 Android、JS、三个 iOS target 添加处理器。
 - Android、H5、iOS、鸿蒙宿主默认页已改为 index；小程序未在本轮完成启动验证。
-- 模板 router、图片测试页、BasicWidget、Utils、IPagerIdKtx、共享 BridgeModule 和 BasePager 已删除；测试图片已清理。各宿主自身桥接实现仍保留。
-- 清理前曾通过桌面、Android、JS 编译；desktop、H5 文本显示已有运行确认。最近模板和 BasePager 清理后没有重新构建，iOS 和鸿蒙没有运行验收。鸿蒙离线配置验证因 Kotlin `2.0.21-KBA-010` 插件未缓存而停止。
-- 共享 UI 允许窄屏单栏、宽屏分栏；布局按容器宽度决定，平台专属能力通过中立接口、插槽或小型适配组件处理。当前自适应能力尚未实现，详见开发指南第 7 节。
+- Kuikly 侧没有公开的 `verticalScroll` 修饰符，可滚动列在 Kuikly actual 中用 `LazyColumn` 承载单个内容项，桌面 actual 使用 `verticalScroll`。
+- 本轮改动后未执行编译或运行验证；桌面与移动端的实际渲染结果仍需分别运行确认。
+
 
 ## 以下为首轮设计基线（历史方案）
 

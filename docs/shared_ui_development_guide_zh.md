@@ -9,14 +9,24 @@
 ```text
 shared/src/
 ├── commonMain/kotlin/com/isogelun/sijinote/
-│   ├── app/Index.kt            定义 IndexScreen()，目前显示三行文本
-│   └── ui/UI.kt               UiText、UiColumn 的 expect 声明
+│   ├── app/
+│   │   ├── Index.kt            根界面：UiAdaptiveLayout 选择宽/窄外壳
+│   │   ├── AppState.kt         应用级界面状态（选中笔记、搜索、筛选、移动端路由）
+│   │   ├── route/AppRoute.kt   AppSection 分区与 AppRoute 页面标识
+│   │   ├── shell/              桌面三栏外壳、移动单栏外壳
+│   │   ├── components/         角标、图标按钮、头像等跨页面小部件
+│   │   ├── note/               列表面板、桌面编辑区、移动编辑页、卡片与正文块
+│   │   ├── search/             搜索页
+│   │   ├── favorites/          收藏页
+│   │   └── settings/           设置面板与设置页
+│   ├── data/                   `NoteRepository` 约定与内存演示数据
+│   └── ui/                     UiTheme.kt（令牌与图标）、Ui.kt（expect 声明）
 ├── kuiklyMain/kotlin/com/isogelun/sijinote/
-│   ├── app/Kuikly.kt          直接继承 ComposeContainer，注册 index
-│   └── ui/UI.kt               Kuikly actual 实现
+│   ├── app/Kuikly.kt           直接继承 ComposeContainer，注册 index
+│   └── ui/Ui.kt                Kuikly actual 实现
 └── composeMain/kotlin/com/isogelun/sijinote/
-    ├── app/Compose.kt         桌面窗口、Material3 主题，调用 IndexScreen
-    └── ui/UI.kt               官方 Compose actual 实现
+    ├── app/Compose.kt          桌面窗口装配，调用 IndexScreen
+    └── ui/Ui.kt                官方 Compose actual 实现
 
 desktopApp/src/main/kotlin/Main.kt
     main() → runSiJiNoteDesktop()
@@ -28,7 +38,7 @@ Android、H5、iOS、鸿蒙的默认页标识均已配置为 `index`。desktop �
 
 验证记录：清理前曾通过桌面、Android、JS 编译及 index 页面注册检查；用户已确认 desktop、H5 显示三行共享文本，内置浏览器也观察到 H5 内容。最近删除模板及 BasePager 后未重新编译或启动验证，不能把先前结果当作清理后版本的完整验收。iOS、鸿蒙没有完成实际运行验证。
 
-目前公共组件只有 `UiText` 和 `UiColumn`。按钮、输入框、列表、公共导航及数据保存均属于下一步工作。
+目前公共组件覆盖：文本层级、行/列/盒布局（含 `Flex` 作用域分配剩余空间）、间距与分隔线、输入框、图标与自适应宽度观测。笔记卡片、正文块、底部导航等由这些基础组件组合而成，不需要额外的 expect/actual。数据仍是内存演示数据，持久化与同步属于下一步工作。
 
 ## 2. 界面在哪里写
 

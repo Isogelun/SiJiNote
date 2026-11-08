@@ -11,8 +11,8 @@ fun runSiJiNoteDesktop() = application {
         onCloseRequest = ::exitApplication,
         title = "思迹笔记",
         state = rememberWindowState(
-            width = 1000.dp,
-            height = 700.dp
+            width = 1280.dp,
+            height = 860.dp
         )
     ) {
         MaterialTheme {
