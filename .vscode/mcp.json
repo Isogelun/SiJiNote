@@ -1,9 +1,0 @@
-{
-  "servers": {
-    "ardot-remote": {
-      "type": "http",
-      "url": "https://ardot.tencent.com/mcp"
-    }
-  },
-  "inputs": []
-}
